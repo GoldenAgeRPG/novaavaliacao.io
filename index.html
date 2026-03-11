@@ -140,6 +140,77 @@
       <div class="form-group"><label>Sumário</label><textarea id="summary"></textarea></div>
     </div>
 
+    <div class="section-box" id="xp-calc-section" style="display:none;">
+      <div class="section-title">Calculadora de XP</div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+        <!-- Left: inputs -->
+        <div>
+          <div id="mission-xp-block" style="margin-bottom:15px;">
+            <label>XP da Missão <small style="color:var(--text-dim); font-weight:400;">(automático pela Ameaça)</small></label>
+            <div id="mission-xp-value" style="font-size:1.4em; font-weight:bold; color:var(--success); margin-top:4px;">—</div>
+          </div>
+
+          <label style="color:var(--warn);">Maldições Derrotadas</label>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
+            <div class="form-group" style="margin-bottom:0">
+              <label>Grau 4 <small style="color:var(--text-dim); font-weight:400;">(100 XP)</small></label>
+              <input type="number" id="mal-g4" min="0" value="0" oninput="updateXpCalc()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Grau 3 <small style="color:var(--text-dim); font-weight:400;">(300 XP)</small></label>
+              <input type="number" id="mal-g3" min="0" value="0" oninput="updateXpCalc()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Grau 2 <small style="color:var(--text-dim); font-weight:400;">(600 XP)</small></label>
+              <input type="number" id="mal-g2" min="0" value="0" oninput="updateXpCalc()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Grau 1 <small style="color:var(--text-dim); font-weight:400;">(1.000 XP)</small></label>
+              <input type="number" id="mal-g1" min="0" value="0" oninput="updateXpCalc()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Semi-Especial <small style="color:var(--text-dim); font-weight:400;">(8.000 XP)</small></label>
+              <input type="number" id="mal-se" min="0" value="0" oninput="updateXpCalc()">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Especial <small style="color:var(--text-dim); font-weight:400;">(10.000 XP)</small></label>
+              <input type="number" id="mal-e" min="0" value="0" oninput="updateXpCalc()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: result + distribution -->
+        <div style="background:rgba(0,0,0,0.2); border-radius:8px; padding:15px; border:1px solid var(--border);">
+          <label>Total XP da Atividade</label>
+          <div id="total-xp-value" style="font-size:2em; font-weight:900; color:var(--accent); margin-top:4px; margin-bottom:8px;">0 XP</div>
+
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <label style="margin:0; white-space:nowrap;">Bônus %</label>
+            <input type="number" id="bonus-pct" min="0" max="999" value="0" oninput="updateXpCalc()" style="width:80px;">
+            <span id="bonus-xp-value" style="color:var(--warn); font-size:0.9em; font-weight:bold;"></span>
+          </div>
+          <div id="total-with-bonus-value" style="font-size:1.3em; font-weight:900; color:var(--success); margin-bottom:12px; display:none;">→ <span></span></div>
+
+          <hr style="border:none; border-top:1px solid var(--border); margin-bottom:15px;">
+
+          <label>Aptidões usadas pelo Jogador</label>
+          <p style="font-size:0.75em; color:var(--text-dim); margin:4px 0 8px;">Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.</p>
+          <input type="text" id="skills-search" placeholder="Pesquisar aptidão..." oninput="filterSkillsChecklist()" style="margin-bottom:5px;">
+          <div id="skills-checklist" style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns: 1fr 1fr; gap:3px; padding:8px; background:var(--input-bg); border-radius:4px; border:1px solid var(--border);">
+            <!-- populated by JS -->
+          </div>
+
+          <div style="margin-top:12px; padding:10px; background:rgba(109,32,197,0.1); border-radius:4px; border:1px solid rgba(109,32,197,0.3);">
+            <div id="dist-skill-xp" style="color:var(--success); font-weight:bold; margin-bottom:4px;">Selecione as aptidões utilizadas</div>
+            <div id="dist-livre-xp" style="color:var(--text-dim); font-size:0.9em;">Livre: +0 XP (30%)</div>
+          </div>
+
+          <button type="button" class="btn-outline" style="margin-top:10px;" onclick="applyToPlayerForm()">↓ Aplicar ao Formulário do Jogador</button>
+        </div>
+      </div>
+    </div>
+
     <div class="section-box">
       <div class="section-title">2. Jogadores e Recompensas</div>
       
@@ -504,12 +575,120 @@ Recupera 50 HP"></textarea>
         }
     }
 
+    // --- CALCULADORA DE XP ---
+    const maldicaoGrades = [
+      { id: 'mal-g4', xp: 100 },
+      { id: 'mal-g3', xp: 300 },
+      { id: 'mal-g2', xp: 600 },
+      { id: 'mal-g1', xp: 1000 },
+      { id: 'mal-se', xp: 8000 },
+      { id: 'mal-e',  xp: 10000 },
+    ];
+
+    const missionXpTable = {
+      'Grau 4': 600, 'Grau 3': 1600, 'Grau 2': 2500,
+      'Grau 1': 4000, 'Grau Semi-Especial': 8000, 'Grau Especial': 10000
+    };
+
+    function buildSkillsChecklist() {
+      const container = document.getElementById('skills-checklist');
+      container.innerHTML = '';
+      for (const [attr, skills] of Object.entries(skillsData)) {
+        skills.forEach(skill => {
+          if (skill === 'Livre') return;
+          const label = document.createElement('label');
+          label.style.cssText = 'display:flex; align-items:center; gap:5px; font-size:0.78em; cursor:pointer; padding:2px 4px; border-radius:3px; white-space:nowrap; overflow:hidden;';
+          label.title = skill + ' (' + attr + ')';
+          label.innerHTML = `<input type="checkbox" value="${skill}" onchange="updateXpCalc()" style="width:auto; flex-shrink:0;"> <span style="overflow:hidden; text-overflow:ellipsis;">${skill}</span> <small style="color:var(--text-dim); flex-shrink:0;">${attr}</small>`;
+          container.appendChild(label);
+        });
+      }
+    }
+
+    function filterSkillsChecklist() {
+      const query = document.getElementById('skills-search').value.toLowerCase();
+      document.querySelectorAll('#skills-checklist label').forEach(label => {
+        const text = label.textContent.toLowerCase();
+        label.style.display = text.includes(query) ? '' : 'none';
+      });
+    }
+
+    function updateXpCalc() {
+      const type = document.getElementById('activity-type').value;
+      const threat = document.getElementById('threat').value;
+
+      document.getElementById('xp-calc-section').style.display = type === 'missao' ? '' : 'none';
+
+      let missionXp = 0;
+      if (type === 'missao') {
+        missionXp = missionXpTable[threat] || 0;
+        document.getElementById('mission-xp-value').textContent = '+' + missionXp.toLocaleString('pt-BR') + ' XP';
+      }
+
+      let maldicaoTotal = 0;
+      maldicaoGrades.forEach(g => {
+        const count = parseInt(document.getElementById(g.id).value) || 0;
+        maldicaoTotal += count * g.xp;
+      });
+
+      const totalXp = missionXp + maldicaoTotal;
+      document.getElementById('total-xp-value').textContent = totalXp.toLocaleString('pt-BR') + ' XP';
+
+      const bonusPct = Math.max(0, parseFloat(document.getElementById('bonus-pct').value) || 0);
+      const bonusXp = Math.floor(totalXp * bonusPct / 100);
+      const totalWithBonus = totalXp + bonusXp;
+
+      const bonusEl = document.getElementById('bonus-xp-value');
+      const totalBonusEl = document.getElementById('total-with-bonus-value');
+      if (bonusPct > 0) {
+        bonusEl.textContent = '+' + bonusXp.toLocaleString('pt-BR') + ' XP';
+        totalBonusEl.style.display = '';
+        totalBonusEl.querySelector('span').textContent = totalWithBonus.toLocaleString('pt-BR') + ' XP total';
+      } else {
+        bonusEl.textContent = '';
+        totalBonusEl.style.display = 'none';
+      }
+
+      const checked = Array.from(document.querySelectorAll('#skills-checklist input[type="checkbox"]:checked'));
+      const numSkills = checked.length;
+      const livreXp = Math.floor(totalWithBonus * 0.3);
+      const skillXp = numSkills > 0 ? Math.floor(totalWithBonus * 0.7 / numSkills) : 0;
+
+      if (numSkills > 0) {
+        document.getElementById('dist-skill-xp').textContent =
+          `Cada aptidão (${numSkills}): +${skillXp.toLocaleString('pt-BR')} XP`;
+      } else {
+        document.getElementById('dist-skill-xp').textContent = 'Selecione as aptidões utilizadas';
+      }
+      document.getElementById('dist-livre-xp').textContent =
+        `Livre: +${livreXp.toLocaleString('pt-BR')} XP (30%)`;
+
+      window._calcResult = { skillXp, livreXp, skills: checked.map(cb => cb.value) };
+    }
+
+    function applyToPlayerForm() {
+      if (!window._calcResult || window._calcResult.skills.length === 0) {
+        alert('Selecione ao menos uma aptidão na calculadora primeiro.');
+        return;
+      }
+      const { skillXp, livreXp, skills } = window._calcResult;
+      const xpContainer = document.getElementById('xp-rows');
+      xpContainer.innerHTML = '';
+      skills.forEach(skill => addXpRow(skill, '+' + skillXp.toLocaleString('pt-BR') + ' XP'));
+      addXpRow('Livre', '+' + livreXp.toLocaleString('pt-BR') + ' XP');
+      document.getElementById('p-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
     // Inicialização
     addXpRow(); // Começa com uma linha
     renderPlayers();
+    buildSkillsChecklist();
+    updateXpCalc();
     ['gm-name', 'loc', 'threat', 'status', 'summary', 'activity-type'].forEach(id => {
       document.getElementById(id).addEventListener('input', generateCode);
     });
+    document.getElementById('activity-type').addEventListener('change', updateXpCalc);
+    document.getElementById('threat').addEventListener('change', updateXpCalc);
   </script>
 </body>
 </html>
