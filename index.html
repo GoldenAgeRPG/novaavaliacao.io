@@ -151,6 +151,11 @@
             <div id="mission-xp-value" style="font-size:1.4em; font-weight:bold; color:var(--success); margin-top:4px;">—</div>
           </div>
 
+          <div id="evento-xp-block" style="margin-bottom:15px; display:none;">
+            <label>XP Base do Evento</label>
+            <input type="number" id="evento-xp-base" min="0" value="0" oninput="updateXpCalc()">
+          </div>
+
           <label style="color:var(--warn);">Maldições Derrotadas</label>
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
             <div class="form-group" style="margin-bottom:0">
@@ -625,12 +630,16 @@ Recupera 50 HP"></textarea>
       const type = document.getElementById('activity-type').value;
       const threat = document.getElementById('threat').value;
 
-      document.getElementById('xp-calc-section').style.display = type === 'missao' ? '' : 'none';
+      document.getElementById('xp-calc-section').style.display = (type === 'missao' || type === 'evento') ? '' : 'none';
+      document.getElementById('mission-xp-block').style.display = type === 'missao' ? '' : 'none';
+      document.getElementById('evento-xp-block').style.display = type === 'evento' ? '' : 'none';
 
       let missionXp = 0;
       if (type === 'missao') {
         missionXp = missionXpTable[threat] || 0;
         document.getElementById('mission-xp-value').textContent = '+' + missionXp.toLocaleString('pt-BR') + ' XP';
+      } else if (type === 'evento') {
+        missionXp = parseInt(document.getElementById('evento-xp-base').value) || 0;
       }
 
       let maldicaoTotal = 0;
