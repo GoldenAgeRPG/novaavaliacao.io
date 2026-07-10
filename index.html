@@ -151,6 +151,11 @@
             <div id="mission-xp-value" style="font-size:1.4em; font-weight:bold; color:var(--success); margin-top:4px;">—</div>
           </div>
 
+          <div id="evento-xp-block" style="margin-bottom:15px; display:none;">
+            <label>XP Base do Evento</label>
+            <input type="number" id="evento-xp-base" min="0" value="0" oninput="updateXpCalc()">
+          </div>
+
           <label style="color:var(--warn);">Maldições Derrotadas</label>
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
             <div class="form-group" style="margin-bottom:0">
@@ -194,8 +199,33 @@
 
           <hr style="border:none; border-top:1px solid var(--border); margin-bottom:15px;">
 
-          <label>Aptidões usadas pelo Jogador</label>
-          <p style="font-size:0.75em; color:var(--text-dim); margin:4px 0 8px;">Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.</p>
+          <div style="margin-bottom:12px; padding:8px; background:rgba(0,0,0,0.15); border-radius:4px; border:1px solid var(--border);">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:0;">
+              <input type="checkbox" id="split-xp-toggle" onchange="toggleSplitXp()" style="width:auto;">
+              Dividir XP com outro jogador (50/50)
+            </label>
+            <div id="split-xp-block" style="display:none; margin-top:8px;">
+              <div class="form-grid" style="gap:8px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label>Jogador 1</label>
+                  <select id="split-player-select-1" onchange="onSplitPlayerChange()">
+                    <option value="">-- Selecione o jogador --</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label>Jogador 2</label>
+                  <select id="split-player-select" onchange="onSplitPlayerChange()">
+                    <option value="">-- Selecione o jogador --</option>
+                  </select>
+                </div>
+              </div>
+              <p style="font-size:0.75em; color:var(--text-dim); margin:6px 0 0;">Ambos jogadores já precisam estar na lista abaixo. O XP aplicado <b>substitui</b> o XP atual de cada um deles.</p>
+              <div id="split-info" style="display:none; margin-top:6px; font-size:0.8em; color:var(--warn); font-weight:bold;"></div>
+            </div>
+          </div>
+
+          <label>Aptidões usadas pelo Jogador <span id="skills-p1-label"></span></label>
+          <p id="skills-split-hint" style="font-size:0.75em; color:var(--text-dim); margin:4px 0 8px;">Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.</p>
           <input type="text" id="skills-search" placeholder="Pesquisar aptidão..." oninput="filterSkillsChecklist()" style="margin-bottom:5px;">
           <div id="skills-checklist" style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns: 1fr 1fr; gap:3px; padding:8px; background:var(--input-bg); border-radius:4px; border:1px solid var(--border);">
             <!-- populated by JS -->
@@ -206,7 +236,21 @@
             <div id="dist-livre-xp" style="color:var(--text-dim); font-size:0.9em;">Livre: +0 XP (30%)</div>
           </div>
 
-          <button type="button" class="btn-outline" style="margin-top:10px;" onclick="applyToPlayerForm()">↓ Aplicar ao Formulário do Jogador</button>
+          <div id="split-xp-block-2" style="display:none; margin-top:15px;">
+            <label>Aptidões usadas pelo Jogador 2</label>
+            <p style="font-size:0.75em; color:var(--text-dim); margin:4px 0 8px;">O jogador escolhido acima recebe estas aptidões somadas ao XP que já possui.</p>
+            <input type="text" id="skills-search-2" placeholder="Pesquisar aptidão..." oninput="filterSkillsChecklist2()" style="margin-bottom:5px;">
+            <div id="skills-checklist-2" style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns: 1fr 1fr; gap:3px; padding:8px; background:var(--input-bg); border-radius:4px; border:1px solid var(--border);">
+              <!-- populated by JS -->
+            </div>
+
+            <div style="margin-top:12px; padding:10px; background:rgba(109,32,197,0.1); border-radius:4px; border:1px solid rgba(109,32,197,0.3);">
+              <div id="dist-skill-xp-2" style="color:var(--success); font-weight:bold; margin-bottom:4px;">Selecione as aptidões utilizadas</div>
+              <div id="dist-livre-xp-2" style="color:var(--text-dim); font-size:0.9em;">Livre: +0 XP (30%)</div>
+            </div>
+          </div>
+
+          <button type="button" id="btn-apply-xp" class="btn-outline" style="margin-top:10px;" onclick="applyToPlayerForm()">↓ Aplicar ao Formulário do Jogador</button>
         </div>
       </div>
     </div>
@@ -426,6 +470,7 @@ Recupera 50 HP"></textarea>
       list.innerHTML = "";
       if (players.length === 0) {
           list.innerHTML = '<p style="color:var(--text-dim); text-align:center;">Nenhum jogador adicionado ainda.</p>';
+          populateSplitPlayerSelect();
           return;
       }
       players.forEach((p, i) => {
@@ -449,6 +494,7 @@ Recupera 50 HP"></textarea>
         `;
         list.appendChild(div);
       });
+      populateSplitPlayerSelect();
     }
 
     // --- GERADOR DE CÓDIGO (LINHA ÚNICA) ---
@@ -621,16 +667,77 @@ Recupera 50 HP"></textarea>
       });
     }
 
+    // --- DIVISÃO DE XP ENTRE 2 JOGADORES ---
+    function buildSkillsChecklist2() {
+      const container = document.getElementById('skills-checklist-2');
+      container.innerHTML = '';
+      for (const [attr, skills] of Object.entries(skillsData)) {
+        skills.forEach(skill => {
+          if (skill === 'Livre') return;
+          const label = document.createElement('label');
+          label.style.cssText = 'display:flex; align-items:center; gap:5px; font-size:0.78em; cursor:pointer; padding:2px 4px; border-radius:3px;';
+          label.title = skill + ' (' + attr + ')';
+          label.innerHTML = `<input type="checkbox" value="${skill}" onchange="toggleSkillCount(this); updateXpCalc();" style="width:auto; flex-shrink:0;"> <span style="overflow:hidden; text-overflow:ellipsis; flex:1;">${skill}</span> <small style="color:var(--text-dim); flex-shrink:0;">${attr}</small> <input type="number" class="skill-count" min="1" value="1" oninput="updateXpCalc()" style="display:none; width:38px; flex-shrink:0; padding:1px 4px; font-size:0.8em; text-align:center;">`;
+          container.appendChild(label);
+        });
+      }
+    }
+
+    function filterSkillsChecklist2() {
+      const query = document.getElementById('skills-search-2').value.toLowerCase();
+      document.querySelectorAll('#skills-checklist-2 label').forEach(label => {
+        const text = label.textContent.toLowerCase();
+        label.style.display = text.includes(query) ? '' : 'none';
+      });
+    }
+
+    function populateSplitPlayerSelect() {
+      const sel1 = document.getElementById('split-player-select-1');
+      const sel2 = document.getElementById('split-player-select');
+      if (!sel1 || !sel2) return;
+      const val1 = sel1.value;
+      const val2 = sel2.value;
+
+      sel1.innerHTML = '<option value="">-- Selecione o jogador --</option>' +
+        players.map((p, i) => i.toString() === val2 ? '' : `<option value="${i}">${p.name}</option>`).join('');
+      if (val1 !== '' && val1 !== val2 && players[val1]) sel1.value = val1;
+
+      sel2.innerHTML = '<option value="">-- Selecione o jogador --</option>' +
+        players.map((p, i) => i.toString() === val1 ? '' : `<option value="${i}">${p.name}</option>`).join('');
+      if (val2 !== '' && val2 !== val1 && players[val2]) sel2.value = val2;
+    }
+
+    function onSplitPlayerChange() {
+      populateSplitPlayerSelect();
+      updateXpCalc();
+    }
+
+    function toggleSplitXp() {
+      const on = document.getElementById('split-xp-toggle').checked;
+      document.getElementById('split-xp-block').style.display = on ? '' : 'none';
+      document.getElementById('split-xp-block-2').style.display = on ? '' : 'none';
+      document.getElementById('skills-p1-label').textContent = on ? '1' : '';
+      document.getElementById('btn-apply-xp').textContent = on
+        ? '↓ Aplicar aos Dois Jogadores Selecionados'
+        : '↓ Aplicar ao Formulário do Jogador';
+      if (on) populateSplitPlayerSelect();
+      updateXpCalc();
+    }
+
     function updateXpCalc() {
       const type = document.getElementById('activity-type').value;
       const threat = document.getElementById('threat').value;
 
-      document.getElementById('xp-calc-section').style.display = type === 'missao' ? '' : 'none';
+      document.getElementById('xp-calc-section').style.display = (type === 'missao' || type === 'evento') ? '' : 'none';
+      document.getElementById('mission-xp-block').style.display = type === 'missao' ? '' : 'none';
+      document.getElementById('evento-xp-block').style.display = type === 'evento' ? '' : 'none';
 
       let missionXp = 0;
       if (type === 'missao') {
         missionXp = missionXpTable[threat] || 0;
         document.getElementById('mission-xp-value').textContent = '+' + missionXp.toLocaleString('pt-BR') + ' XP';
+      } else if (type === 'evento') {
+        missionXp = parseInt(document.getElementById('evento-xp-base').value) || 0;
       }
 
       let maldicaoTotal = 0;
@@ -657,29 +764,59 @@ Recupera 50 HP"></textarea>
         totalBonusEl.style.display = 'none';
       }
 
-      const checked = Array.from(document.querySelectorAll('#skills-checklist input[type="checkbox"]:checked'));
-      const numSkills = checked.length;
-      const livreXp = Math.floor(totalWithBonus * 0.3);
-      const pool70 = totalWithBonus - livreXp;
+      const splitOn = document.getElementById('split-xp-toggle').checked;
+      const share1 = splitOn ? Math.ceil(totalWithBonus / 2) : totalWithBonus;
+      const share2 = splitOn ? totalWithBonus - share1 : 0;
 
-      if (numSkills > 0) {
+      const splitInfoEl = document.getElementById('split-info');
+      if (splitOn) {
+        splitInfoEl.style.display = '';
+        splitInfoEl.textContent = `Jogador 1: +${share1.toLocaleString('pt-BR')} XP | Jogador 2: +${share2.toLocaleString('pt-BR')} XP`;
+      } else {
+        splitInfoEl.style.display = 'none';
+      }
+
+      const hasLivre = type !== 'evento';
+      document.getElementById('skills-split-hint').textContent = hasLivre
+        ? 'Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.'
+        : 'Marque as aptidões para calcular a divisão. Todo o XP é dividido entre as aptidões selecionadas. Os valores já são arredondados para baixo.';
+      window._calcResult = computeSkillDistribution(share1, 'skills-checklist', 'dist-skill-xp', 'dist-livre-xp', hasLivre);
+      window._calcResult2 = splitOn
+        ? computeSkillDistribution(share2, 'skills-checklist-2', 'dist-skill-xp-2', 'dist-livre-xp-2', hasLivre)
+        : null;
+    }
+
+    function computeSkillDistribution(pool, checklistId, distSkillElId, distLivreElId, hasLivre) {
+      const checked = Array.from(document.querySelectorAll('#' + checklistId + ' input[type="checkbox"]:checked'));
+      const livreXp = hasLivre ? Math.floor(pool * 0.3) : 0;
+      const pool70 = pool - livreXp;
+      let skillsXp = [];
+
+      if (checked.length > 0) {
         const totalUses = checked.reduce((sum, cb) => {
           const uses = parseInt(cb.parentElement.querySelector('.skill-count')?.value) || 1;
           return sum + uses;
         }, 0);
-        const skillsXp = checked.map(cb => {
+        skillsXp = checked.map(cb => {
           const uses = parseInt(cb.parentElement.querySelector('.skill-count')?.value) || 1;
           return { skill: cb.value, uses, xp: Math.floor(pool70 * uses / totalUses) };
         });
-        document.getElementById('dist-skill-xp').innerHTML =
+        document.getElementById(distSkillElId).innerHTML =
           skillsXp.map(s => `${s.skill} (${s.uses}x): +${s.xp.toLocaleString('pt-BR')} XP`).join('<br>');
-        window._calcResult = { skillsXp, livreXp };
       } else {
-        document.getElementById('dist-skill-xp').textContent = 'Selecione as aptidões utilizadas';
-        window._calcResult = { skillsXp: [], livreXp };
+        document.getElementById(distSkillElId).textContent = 'Selecione as aptidões utilizadas';
       }
-      document.getElementById('dist-livre-xp').textContent =
-        `Livre: +${livreXp.toLocaleString('pt-BR')} XP (30%)`;
+      const livreEl = document.getElementById(distLivreElId);
+      livreEl.style.display = hasLivre ? '' : 'none';
+      livreEl.textContent = `Livre: +${livreXp.toLocaleString('pt-BR')} XP (30%)`;
+
+      return { skillsXp, livreXp, hasLivre };
+    }
+
+    function xpRowsFromResult({ skillsXp, livreXp, hasLivre }) {
+      const rows = skillsXp.map(({ skill, xp }) => ({ skill, value: '+' + xp.toLocaleString('pt-BR') + ' XP' }));
+      if (hasLivre) rows.push({ skill: 'Livre', value: '+' + livreXp.toLocaleString('pt-BR') + ' XP' });
+      return rows;
     }
 
     function applyToPlayerForm() {
@@ -687,11 +824,35 @@ Recupera 50 HP"></textarea>
         alert('Selecione ao menos uma aptidão na calculadora primeiro.');
         return;
       }
-      const { skillsXp, livreXp } = window._calcResult;
+
+      const splitOn = document.getElementById('split-xp-toggle').checked;
+
+      if (splitOn) {
+        const idx1Raw = document.getElementById('split-player-select-1').value;
+        const idx2Raw = document.getElementById('split-player-select').value;
+        if (idx1Raw === '' || idx2Raw === '') {
+          alert('Selecione o Jogador 1 e o Jogador 2 para dividir o XP.');
+          return;
+        }
+        if (idx1Raw === idx2Raw) {
+          alert('Escolha dois jogadores diferentes para dividir o XP.');
+          return;
+        }
+        if (!window._calcResult2 || window._calcResult2.skillsXp.length === 0) {
+          alert('Selecione ao menos uma aptidão para o Jogador 2.');
+          return;
+        }
+
+        players[parseInt(idx1Raw)].xp = xpRowsFromResult(window._calcResult);
+        players[parseInt(idx2Raw)].xp = xpRowsFromResult(window._calcResult2);
+        renderPlayers();
+        generateCode();
+        return;
+      }
+
       const xpContainer = document.getElementById('xp-rows');
       xpContainer.innerHTML = '';
-      skillsXp.forEach(({ skill, xp }) => addXpRow(skill, '+' + xp.toLocaleString('pt-BR') + ' XP'));
-      addXpRow('Livre', '+' + livreXp.toLocaleString('pt-BR') + ' XP');
+      xpRowsFromResult(window._calcResult).forEach(({ skill, value }) => addXpRow(skill, value));
       document.getElementById('p-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
@@ -699,6 +860,7 @@ Recupera 50 HP"></textarea>
     addXpRow(); // Começa com uma linha
     renderPlayers();
     buildSkillsChecklist();
+    buildSkillsChecklist2();
     updateXpCalc();
     ['gm-name', 'loc', 'threat', 'status', 'summary', 'activity-type'].forEach(id => {
       document.getElementById(id).addEventListener('input', generateCode);
