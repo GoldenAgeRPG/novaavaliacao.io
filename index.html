@@ -225,7 +225,7 @@
           </div>
 
           <label>Aptidões usadas pelo Jogador <span id="skills-p1-label"></span></label>
-          <p style="font-size:0.75em; color:var(--text-dim); margin:4px 0 8px;">Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.</p>
+          <p id="skills-split-hint" style="font-size:0.75em; color:var(--text-dim); margin:4px 0 8px;">Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.</p>
           <input type="text" id="skills-search" placeholder="Pesquisar aptidão..." oninput="filterSkillsChecklist()" style="margin-bottom:5px;">
           <div id="skills-checklist" style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns: 1fr 1fr; gap:3px; padding:8px; background:var(--input-bg); border-radius:4px; border:1px solid var(--border);">
             <!-- populated by JS -->
@@ -776,15 +776,19 @@ Recupera 50 HP"></textarea>
         splitInfoEl.style.display = 'none';
       }
 
-      window._calcResult = computeSkillDistribution(share1, 'skills-checklist', 'dist-skill-xp', 'dist-livre-xp');
+      const hasLivre = type !== 'evento';
+      document.getElementById('skills-split-hint').textContent = hasLivre
+        ? 'Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.'
+        : 'Marque as aptidões para calcular a divisão. Todo o XP é dividido entre as aptidões selecionadas. Os valores já são arredondados para baixo.';
+      window._calcResult = computeSkillDistribution(share1, 'skills-checklist', 'dist-skill-xp', 'dist-livre-xp', hasLivre);
       window._calcResult2 = splitOn
-        ? computeSkillDistribution(share2, 'skills-checklist-2', 'dist-skill-xp-2', 'dist-livre-xp-2')
+        ? computeSkillDistribution(share2, 'skills-checklist-2', 'dist-skill-xp-2', 'dist-livre-xp-2', hasLivre)
         : null;
     }
 
-    function computeSkillDistribution(pool, checklistId, distSkillElId, distLivreElId) {
+    function computeSkillDistribution(pool, checklistId, distSkillElId, distLivreElId, hasLivre) {
       const checked = Array.from(document.querySelectorAll('#' + checklistId + ' input[type="checkbox"]:checked'));
-      const livreXp = Math.floor(pool * 0.3);
+      const livreXp = hasLivre ? Math.floor(pool * 0.3) : 0;
       const pool70 = pool - livreXp;
       let skillsXp = [];
 
@@ -802,15 +806,16 @@ Recupera 50 HP"></textarea>
       } else {
         document.getElementById(distSkillElId).textContent = 'Selecione as aptidões utilizadas';
       }
-      document.getElementById(distLivreElId).textContent =
-        `Livre: +${livreXp.toLocaleString('pt-BR')} XP (30%)`;
+      const livreEl = document.getElementById(distLivreElId);
+      livreEl.style.display = hasLivre ? '' : 'none';
+      livreEl.textContent = `Livre: +${livreXp.toLocaleString('pt-BR')} XP (30%)`;
 
-      return { skillsXp, livreXp };
+      return { skillsXp, livreXp, hasLivre };
     }
 
-    function xpRowsFromResult({ skillsXp, livreXp }) {
+    function xpRowsFromResult({ skillsXp, livreXp, hasLivre }) {
       const rows = skillsXp.map(({ skill, xp }) => ({ skill, value: '+' + xp.toLocaleString('pt-BR') + ' XP' }));
-      rows.push({ skill: 'Livre', value: '+' + livreXp.toLocaleString('pt-BR') + ' XP' });
+      if (hasLivre) rows.push({ skill: 'Livre', value: '+' + livreXp.toLocaleString('pt-BR') + ' XP' });
       return rows;
     }
 
