@@ -53,6 +53,12 @@
     .btn-add-xp { background: var(--input-bg); border: 1px dashed var(--accent); color: var(--accent); width: 100%; padding: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
     .btn-add-xp:hover { background: rgba(109, 32, 197, 0.1); }
 
+    /* --- Penalidade por Grau Relativo --- */
+    .penalty-skills-box { display: flex; flex-wrap: wrap; gap: 4px 10px; max-height: 110px; overflow-y: auto; padding: 8px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px; }
+    .penalty-skills-box label { display: flex; align-items: center; gap: 5px; font-size: 0.78em; color: var(--text); font-weight: 400; margin-bottom: 0; cursor: pointer; }
+    .penalty-skills-box input { width: auto; }
+    .penalty-skills-box .empty { font-size: 0.78em; color: var(--text-dim); }
+
     /* --- Buttons --- */
     button { padding: 10px 20px; border: none; border-radius: 4px; font-weight: 700; cursor: pointer; color: #fff; transition: filter 0.2s; }
     button:hover { filter: brightness(1.2); }
@@ -231,9 +237,32 @@
             <!-- populated by JS -->
           </div>
 
+          <div style="margin-top:12px; padding:8px; background:rgba(0,0,0,0.15); border-radius:4px; border:1px solid var(--border);">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:0;">
+              <input type="checkbox" id="penalty-toggle" onchange="togglePenalty('')" style="width:auto;">
+              Reduzir XP de aptidões (Grau Relativo)
+            </label>
+            <div id="penalty-block" style="display:none; margin-top:8px;">
+              <div class="form-group" style="margin-bottom:8px;">
+                <label>Grau Relativo do Personagem</label>
+                <select id="penalty-grade" onchange="updateXpCalc()">
+                  <option value="100">Grau 4 (-100%)</option>
+                  <option value="80">Grau 3 (-80%)</option>
+                  <option value="60">Grau 2 (-60%)</option>
+                  <option value="40">Grau 1 (-40%)</option>
+                  <option value="20">Semi-Especial (-20%)</option>
+                </select>
+              </div>
+              <label>Aptidões penalizadas</label>
+              <div id="penalty-skills" class="penalty-skills-box"></div>
+              <p style="font-size:0.75em; color:var(--text-dim); margin:6px 0 0;">O mesmo grau vale para todas as marcadas. O XP perdido não é redistribuído.</p>
+            </div>
+          </div>
+
           <div style="margin-top:12px; padding:10px; background:rgba(109,32,197,0.1); border-radius:4px; border:1px solid rgba(109,32,197,0.3);">
             <div id="dist-skill-xp" style="color:var(--success); font-weight:bold; margin-bottom:4px;">Selecione as aptidões utilizadas</div>
             <div id="dist-livre-xp" style="color:var(--text-dim); font-size:0.9em;">Livre: +0 XP (30%)</div>
+            <div id="penalty-info" style="display:none; color:var(--danger); font-size:0.85em; font-weight:bold; margin-top:4px;"></div>
           </div>
 
           <div id="split-xp-block-2" style="display:none; margin-top:15px;">
@@ -244,9 +273,32 @@
               <!-- populated by JS -->
             </div>
 
+            <div style="margin-top:12px; padding:8px; background:rgba(0,0,0,0.15); border-radius:4px; border:1px solid var(--border);">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:0;">
+                <input type="checkbox" id="penalty-toggle-2" onchange="togglePenalty('-2')" style="width:auto;">
+                Reduzir XP de aptidões (Grau Relativo)
+              </label>
+              <div id="penalty-block-2" style="display:none; margin-top:8px;">
+                <div class="form-group" style="margin-bottom:8px;">
+                  <label>Grau Relativo do Personagem</label>
+                  <select id="penalty-grade-2" onchange="updateXpCalc()">
+                    <option value="100">Grau 4 (-100%)</option>
+                    <option value="80">Grau 3 (-80%)</option>
+                    <option value="60">Grau 2 (-60%)</option>
+                    <option value="40">Grau 1 (-40%)</option>
+                    <option value="20">Semi-Especial (-20%)</option>
+                  </select>
+                </div>
+                <label>Aptidões penalizadas</label>
+                <div id="penalty-skills-2" class="penalty-skills-box"></div>
+                <p style="font-size:0.75em; color:var(--text-dim); margin:6px 0 0;">O mesmo grau vale para todas as marcadas. O XP perdido não é redistribuído.</p>
+              </div>
+            </div>
+
             <div style="margin-top:12px; padding:10px; background:rgba(109,32,197,0.1); border-radius:4px; border:1px solid rgba(109,32,197,0.3);">
               <div id="dist-skill-xp-2" style="color:var(--success); font-weight:bold; margin-bottom:4px;">Selecione as aptidões utilizadas</div>
               <div id="dist-livre-xp-2" style="color:var(--text-dim); font-size:0.9em;">Livre: +0 XP (30%)</div>
+              <div id="penalty-info-2" style="display:none; color:var(--danger); font-size:0.85em; font-weight:bold; margin-top:4px;"></div>
             </div>
           </div>
 
@@ -724,6 +776,34 @@ Recupera 50 HP"></textarea>
       updateXpCalc();
     }
 
+    // --- PENALIDADE POR GRAU RELATIVO ---
+    function togglePenalty(suffix) {
+      const on = document.getElementById('penalty-toggle' + suffix).checked;
+      document.getElementById('penalty-block' + suffix).style.display = on ? '' : 'none';
+      updateXpCalc();
+    }
+
+    // Só permite penalizar aptidões que estão marcadas na checklist correspondente
+    function refreshPenaltySkillOptions(checklistId, suffix) {
+      const box = document.getElementById('penalty-skills' + suffix);
+      const prev = new Set(Array.from(box.querySelectorAll('input:checked')).map(i => i.value));
+      const skills = Array.from(document.querySelectorAll('#' + checklistId + ' input[type="checkbox"]:checked')).map(cb => cb.value);
+
+      box.innerHTML = skills.length === 0
+        ? '<span class="empty">Marque as aptidões utilizadas acima primeiro.</span>'
+        : skills.map(s => `<label><input type="checkbox" value="${s}" ${prev.has(s) ? 'checked' : ''} onchange="updateXpCalc()"> ${s}</label>`).join('');
+    }
+
+    function getPenaltyConfig(suffix) {
+      const gradeSel = document.getElementById('penalty-grade' + suffix);
+      return {
+        on: document.getElementById('penalty-toggle' + suffix).checked,
+        pct: parseInt(gradeSel.value) || 0,
+        label: gradeSel.selectedOptions[0]?.textContent || '',
+        skills: Array.from(document.querySelectorAll('#penalty-skills' + suffix + ' input:checked')).map(i => i.value)
+      };
+    }
+
     function updateXpCalc() {
       const type = document.getElementById('activity-type').value;
       const threat = document.getElementById('threat').value;
@@ -780,17 +860,22 @@ Recupera 50 HP"></textarea>
       document.getElementById('skills-split-hint').textContent = hasLivre
         ? 'Marque as aptidões para calcular a divisão. 70% dividido entre elas, 30% fica como XP Livre. Os valores já são arredondados para baixo.'
         : 'Marque as aptidões para calcular a divisão. Todo o XP é dividido entre as aptidões selecionadas. Os valores já são arredondados para baixo.';
-      window._calcResult = computeSkillDistribution(share1, 'skills-checklist', 'dist-skill-xp', 'dist-livre-xp', hasLivre);
+      refreshPenaltySkillOptions('skills-checklist', '');
+      refreshPenaltySkillOptions('skills-checklist-2', '-2');
+
+      window._calcResult = computeSkillDistribution(share1, 'skills-checklist', 'dist-skill-xp', 'dist-livre-xp', hasLivre, '');
       window._calcResult2 = splitOn
-        ? computeSkillDistribution(share2, 'skills-checklist-2', 'dist-skill-xp-2', 'dist-livre-xp-2', hasLivre)
+        ? computeSkillDistribution(share2, 'skills-checklist-2', 'dist-skill-xp-2', 'dist-livre-xp-2', hasLivre, '-2')
         : null;
     }
 
-    function computeSkillDistribution(pool, checklistId, distSkillElId, distLivreElId, hasLivre) {
+    function computeSkillDistribution(pool, checklistId, distSkillElId, distLivreElId, hasLivre, penaltySuffix) {
       const checked = Array.from(document.querySelectorAll('#' + checklistId + ' input[type="checkbox"]:checked'));
       const livreXp = hasLivre ? Math.floor(pool * 0.3) : 0;
       const pool70 = pool - livreXp;
+      const penalty = getPenaltyConfig(penaltySuffix);
       let skillsXp = [];
+      let penaltyLost = 0;
 
       if (checked.length > 0) {
         const totalUses = checked.reduce((sum, cb) => {
@@ -801,14 +886,40 @@ Recupera 50 HP"></textarea>
           const uses = parseInt(cb.parentElement.querySelector('.skill-count')?.value) || 1;
           return { skill: cb.value, uses, xp: Math.floor(pool70 * uses / totalUses) };
         });
-        document.getElementById(distSkillElId).innerHTML =
-          skillsXp.map(s => `${s.skill} (${s.uses}x): +${s.xp.toLocaleString('pt-BR')} XP`).join('<br>');
+
+        if (penalty.on && penalty.skills.length > 0) {
+          const penalized = new Set(penalty.skills);
+          skillsXp = skillsXp.map(s => {
+            if (!penalized.has(s.skill)) return s;
+            const finalXp = Math.floor(s.xp * (100 - penalty.pct) / 100);
+            penaltyLost += s.xp - finalXp;
+            return { ...s, xp: finalXp, originalXp: s.xp, penaltyPct: penalty.pct };
+          });
+        }
+
+        document.getElementById(distSkillElId).innerHTML = skillsXp.map(s => {
+          const base = `${s.skill} (${s.uses}x): +${s.xp.toLocaleString('pt-BR')} XP`;
+          return s.originalXp === undefined
+            ? base
+            : `${base} <small style="color:var(--danger); font-weight:400;">(era +${s.originalXp.toLocaleString('pt-BR')} XP)</small>`;
+        }).join('<br>');
       } else {
         document.getElementById(distSkillElId).textContent = 'Selecione as aptidões utilizadas';
       }
       const livreEl = document.getElementById(distLivreElId);
       livreEl.style.display = hasLivre ? '' : 'none';
       livreEl.textContent = `Livre: +${livreXp.toLocaleString('pt-BR')} XP (30%)`;
+
+      const penaltyInfoEl = document.getElementById('penalty-info' + penaltySuffix);
+      if (penalty.on && penalty.skills.length > 0) {
+        penaltyInfoEl.style.display = '';
+        penaltyInfoEl.textContent = `Penalidade ${penalty.label} em ${penalty.skills.join(', ')}: -${penaltyLost.toLocaleString('pt-BR')} XP`;
+      } else if (penalty.on) {
+        penaltyInfoEl.style.display = '';
+        penaltyInfoEl.textContent = 'Selecione as aptidões que receberão a penalidade.';
+      } else {
+        penaltyInfoEl.style.display = 'none';
+      }
 
       return { skillsXp, livreXp, hasLivre };
     }
